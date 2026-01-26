@@ -11,7 +11,7 @@ from datetime import datetime
 st.set_page_config(page_title="Kronologic (SoCal 2026)", layout="wide", initial_sidebar_state="collapsed")
 
 def check_password():
-    SECRET_PASSWORD = "tianhaoyun" 
+    SECRET_PASSWORD = st.secrets["PASSWORD"]
 
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
