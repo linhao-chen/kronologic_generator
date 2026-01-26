@@ -30,7 +30,7 @@ def check_password():
 check_password()
 
 # ==============================================================================
-# 1. 核心游戏引擎 (Game Engine)
+# 1. Setups
 # ==============================================================================
 
 ROOMS = ["牌坊", "信号", "鱿鱼", "面具", "音乐", "舞蹈"]
@@ -109,9 +109,9 @@ class ScenarioGenerator:
                     finder = people_in_spawn[0]
                     jewel_active = True
                     current_holder = finder
-                    log.append({"Time": t, "Holder": finder, "Room": SPAWN_ROOM, "Desc": "✨ 发现宝石！"})
+                    log.append({"Time": t, "Holder": finder, "Room": SPAWN_ROOM, "Desc": "✨ 发现珠宝！"})
                 else:
-                    log.append({"Time": t, "Holder": "无", "Room": SPAWN_ROOM, "Desc": "无人独处，宝石未现身"})
+                    log.append({"Time": t, "Holder": "无", "Room": SPAWN_ROOM, "Desc": "无人独处，珠宝未现身"})
 
             else:
                 loc = self.board.loc[current_holder, t]
@@ -138,7 +138,7 @@ class ScenarioGenerator:
 
         spawn_condition = False
         for entry in log:
-            if entry["Desc"] == "✨ 发现宝石！" and entry["Time"] <= 3:
+            if entry["Desc"] == "✨ 发现珠宝！" and entry["Time"] <= 3:
                 spawn_condition = True
                 break
 
@@ -162,7 +162,7 @@ class ScenarioGenerator:
             t1_row = self.solution_data[self.solution_data["Time"] == 1]
             if not t1_row.empty:
                 row_data = t1_row.iloc[0]
-                if "发现宝石" in str(row_data["Desc"]):
+                if "发现珠宝" in str(row_data["Desc"]):
                     excluded_person = row_data["Holder"]
         
         candidates = [c for c in CHARACTERS if c != excluded_person]
@@ -176,7 +176,7 @@ class ScenarioGenerator:
         return clues
 
 # ==============================================================================
-# 2. 全局状态管理 (Server State)
+# 2. Server
 # ==============================================================================
 
 @st.cache_resource
@@ -253,7 +253,7 @@ class GlobalGameState:
 SERVER = GlobalGameState()
 
 # ==============================================================================
-# 3. 前端界面 (Mobile UI)
+# 3. GUI
 # ==============================================================================
 
 if "default_room" not in st.session_state:
@@ -304,8 +304,8 @@ mode_icon = "💎" if mode_code == "jewel" else "🎎"
 st.subheader(f"{mode_icon} 房间 {room_code} | 🕵️ {username}")
 
 if mode_code == "jewel":
-    spawn_row = game.solution_data[game.solution_data["Desc"] == "✨ 发现宝石！"]
-    st.info(f"💎 **目标：** 找出 **T6** 结束后宝石在谁手中！")
+    spawn_row = game.solution_data[game.solution_data["Desc"] == "✨ 发现珠宝！"]
+    st.info(f"💎 **目标：** 找出 **T6** 结束后珠宝在谁手中！")
     if spawn_row.empty:
         st.error("⚠️ 本局生成异常，建议重开")
 else:
@@ -313,12 +313,10 @@ else:
 
 
 # =========================================================
-# 🏗️ 核心布局：调查区与日志区合并
+# Logistics
 # =========================================================
 
 st.markdown("### 🔍 发起调查")
-
-
 
 with st.container(border=True):
     q_type = st.radio("模式", ["🏛️ 查地点", "👤 查人物"], horizontal=True, label_visibility="collapsed")
@@ -339,13 +337,9 @@ with st.container(border=True):
             if count == 0:
                 pri = "你看到：**空无一人**，可再进行一次调查"
             else:
-                # === 🧠 智能筛选逻辑 (查地点) ===
                 candidates = []
                 for p in people:
-                    # 1. 检查是否是初始已知信息 (0分)
                     is_init = (selected_time == 1) and any(c['char'] == p and c['room'] == target_room for c in game.initial_clues)
-                    
-                    # 2. 检查唯一性 (1分) - 如果该人全场只来过这一次，查“人”就能知道，价值较低
                     row = game.board.loc[p]
                     visits = len(row[row == target_room])
                     is_unique_visit = (visits == 1)
@@ -356,20 +350,17 @@ with st.container(border=True):
                     
                     candidates.append({'p': p, 'score': score})
                 
-                # 排序：优先高分，同分打乱
                 random.shuffle(candidates) 
                 candidates.sort(key=lambda x: x['score'], reverse=True)
                 
                 best = candidates[0]
                 
-                # 如果最高分都是0分，说明全是已知信息 -> 警告
                 if best['score'] == 0:
                      chars_str = "、".join([c['p'] for c in candidates])
                      pri = f"⚠️ **无效调查**：初始线索已告知 **{chars_str}** 在 **T1** 位于此处。这是已知信息！"
                 else:
                     seen = best['p']
                     pri = f"你看到了 **{seen}** 独处一室" if count==1 else f"透过缝隙认出了其中的 **{seen}**"
-                    # 可选：如果 score == 1，可以加个小提示 (但为了简洁暂不加)
             
             confirm = True
 
@@ -388,13 +379,10 @@ with st.container(border=True):
             if count == 0:
                 pri = "线索：**从未去过**，可再进行一次调查"
             else:
-                # === 🧠 智能筛选逻辑 (查人物) ===
                 candidates = []
                 for t in matches:
-                    # 1. 检查是否是初始已知信息 (0分)
                     is_init = (t == 1) and any(c['char'] == target_char and c['room'] == target_room for c in game.initial_clues)
-                    
-                    # 2. 检查唯一性 (1分) - 如果该时刻房间只有他一个人，查“地”就能知道，价值较低
+
                     col = game.board[t]
                     occupancy = len(col[col == target_room])
                     is_single_occupancy = (occupancy == 1)
@@ -405,7 +393,6 @@ with st.container(border=True):
                     
                     candidates.append({'t': t, 'score': score})
                 
-                # 排序
                 random.shuffle(candidates)
                 candidates.sort(key=lambda x: x['score'], reverse=True)
                 
@@ -427,7 +414,6 @@ with st.container(border=True):
 
 st.divider() 
 
-# --- Part 2: 实时日志区域 ---
 col_log_title, col_log_btn = st.columns([3, 1], vertical_alignment="center")
 with col_log_title:
     st.markdown("### 📡 实时记录")
@@ -456,7 +442,7 @@ for log in logs:
 st.markdown("---")
 
 # =========================================================
-# 🔐 显示答案 (Footer)
+# Solution
 # =========================================================
 
 with st.expander("🔐 查看答案"):
@@ -475,7 +461,7 @@ with st.expander("🔐 查看答案"):
             st.rerun()
     
     if st.session_state.has_revealed:
-        tab_ans_1, tab_ans_2 = st.tabs(["💎 宝石流向", "🗺️ 位置表"])
+        tab_ans_1, tab_ans_2 = st.tabs(["💎 珠宝流向", "🗺️ 位置表"])
         
         with tab_ans_1:
             if mode_code == "jewel":
