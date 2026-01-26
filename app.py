@@ -90,6 +90,7 @@ class ScenarioGenerator:
         else:
             data = {char: [] for char in SHARMANS}
             self.ritual_patterns = {} 
+            self.pace_list = []
 
             cycle_len = 3
             
@@ -99,10 +100,10 @@ class ScenarioGenerator:
                 start_index = TERRAIN_LOOP.index(start_room)
                 
                 # 2. Generate Pace
-                pattern = self._generate_valid_pattern(cycle_len)
+                pattern = self._generate_valid_pattern()
                 
                 # 3. Generate Offset
-                pattern_offset = random.randint(0, cycle_len - 1)
+                pattern_offset = random.randint(0, len(pattern) - 1)
                 
                 self.ritual_patterns[char] = {
                     "pattern": pattern,
@@ -127,16 +128,53 @@ class ScenarioGenerator:
         board.columns = TIMES
         return board
 
-    def _generate_valid_pattern(self, length, min_sum=5, max_sum=8):
+    def _generate_valid_pattern(self):
+        choices = [1, 2, 3]
+        base_weights = {1: 50, 2: 35, 3: 15}
+        min_sum = 5
+
+        if self.mode == "ritual_easy":
+            max_sum = 7
+        else:
+            max_sum = 8
+        
         while True:
             p = []
-            for _ in range(length):
-                if random.random() < 0.8:
-                    p.append(random.randint(1, 2))
-                else:
-                    p.append(3)
+            s1 = random.choices(choices, weights=[base_weights[c] for c in choices], k=1)[0]
+            p.append(s1)
+
+            if self.mode == "ritual_easy":
+                cycle_len = 3
+            else:
+                cycle_len = random.choices([3, 4], weights=[0.67, 0.33])[0]
             
-            if min_sum <= sum(p) <= max_sum:
+            for _ in range(cycle_len - 1):
+                prev = p[-1]
+                valid_options = [x for x in choices if x >= prev]
+
+                current_weights = [base_weights[x] for x in valid_options]
+                
+                s_next = random.choices(valid_options, weights=current_weights, k=1)[0]
+                p.append(s_next)
+            
+            # validity check
+            range_issue = False
+            repeat_issue = False
+
+            if not(min_sum <= sum(p) <= max_sum):
+                range_issue = True
+            
+            for current_pace in self.pace_list:
+                same_count = False
+                for i in range(0, 3):
+                    if current_pace[i] == p[i]:
+                        same_count += 1
+                if same_count == 3:
+                    repeat_issue = True
+                    break
+
+            if not (range_issue or repeat_issue):
+                self.pace_list.append(p)
                 return p
 
     def _solve_jewel_with_constraints(self):
@@ -246,7 +284,7 @@ class GlobalGameState:
         self.games[game_key] = new_game
         self.logs[game_key] = []
         self.versions[game_key] = time.time()
-        self._log_initial_clues(game_key, new_game)
+        self._log_initial_clues(game_key, new_game, mode_choice)
 
     def get_version(self, room_code, mode_choice):
         game_key = f"{room_code}_{mode_choice}"
@@ -272,7 +310,7 @@ class GlobalGameState:
         if game_key in self.logs:
             self.logs[game_key] = []
             if game_key in self.games:
-                 self._log_initial_clues(game_key, self.games[game_key])
+                 self._log_initial_clues(game_key, self.games[game_key], mode_choice)
 
     def new_game(self, room_code, mode_choice):
         game_key = f"{room_code}_{mode_choice}"
@@ -281,9 +319,9 @@ class GlobalGameState:
         self.games[game_key] = new_game
         self.logs[game_key] = []
         self.versions[game_key] = time.time()
-        self._log_initial_clues(game_key, new_game)
+        self._log_initial_clues(game_key, new_game, mode_choice)
 
-    def _log_initial_clues(self, game_key, game_instance):
+    def _log_initial_clues(self, game_key, game_instance, mode_choice):
         if game_instance.initial_clues:
             clue_str_list = [f"**{c['char'].split(')')[0]})** 在 {c['room']}" for c in game_instance.initial_clues]
             clue_str = " | ".join(clue_str_list)
@@ -298,6 +336,24 @@ class GlobalGameState:
                 "type": "warning"
             }
             self.logs[game_key].append(entry)
+        
+        if "ritual" in mode_choice:
+            pace_list = []
+            for pace in game_instance.pace_list:
+                pace_list.append(str(pace))
+            pace_list.sort(key=lambda x: (len(x), x))
+            pace_str = " , ".join(pace_list)
+            
+            entry_pace = {
+                "time": "00:00",
+                "player": "🫅 系统",
+                "desc": "发布舞步信息 (Pace)",
+                "public": f"👣 {pace_str}",
+                "private": "所有玩家可见",
+                "owner": "SYSTEM",
+                "type": "warning"
+            }
+            self.logs[game_key].append(entry_pace)
 
 SERVER = GlobalGameState()
 
@@ -383,7 +439,7 @@ with st.container(border=True):
             with col_a2: selected_time = st.selectbox("选择时间", TIMES)
         else:
             with col_a1: target_room = st.selectbox("选择房间", TERRAIN_LOOP)
-            with col_a2: selected_time = st.selectbox("选择时间", TIMES[:5])
+            with col_a2: selected_time = st.selectbox("选择时间", TIMES[1:5])
         
         if st.button("🔎 确认调查", use_container_width=True, type="primary"):
             people = game.board[selected_time][game.board[selected_time] == target_room].index.tolist()
@@ -533,8 +589,39 @@ with st.expander("🔐 查看答案"):
                 final = game.solution_data.iloc[-1]
                 st.error(f"🏆 **最终答案**: 珠宝在 **{final['Holder']}** 手中，位于 **{final['Room']}**")
             else:
-                pass
+                st.dataframe(game.board, use_container_width=True)
+
+                t6_data = game.board[6].sort_index()
+                lines = []
+                for char, room in t6_data.items():
+                    short_name = char.split(')')[0] + ")"
+                    lines.append(f"**{short_name}**: {room}")
+                
+                final_text = " | ".join(lines)
+                st.error(f"🏆 **最终答案**: {final_text}")
 
         with tab_ans_2:
-            st.dataframe(game.board, use_container_width=True)
-            st.caption("行：角色 | 列：时间 (T1-T6)")
+            if mode_code == "jewel":
+                st.dataframe(game.board, use_container_width=True)
+                st.caption("行：角色 | 列：时间 (T1-T6)")
+            else:
+                rows = []
+                for char, info in game.ritual_patterns.items():
+                    base_pat = info['pattern']
+                    offset = info['start_offset']
+                    
+                    actual_pat = base_pat[offset:] + base_pat[:offset]
+                    
+                    rows.append({
+                        "角色": char,
+                        "T1 位置": info['start_room'],
+                        "步频模式": str(base_pat), 
+                        "偏移量": offset,
+                        "实际执行": str(actual_pat),
+                        "_sort_key": actual_pat 
+                    })
+                
+                df = pd.DataFrame(rows)
+                df = df.sort_values(by="_sort_key", key=lambda x: x.map(lambda k: (len(k), k)))
+                df = df.drop(columns=["_sort_key"]).reset_index(drop=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
