@@ -52,7 +52,8 @@ class ScenarioGenerator:
     def __init__(self, seed_val, mode="jewel"):
         self.seed_val = seed_val
         self.mode = mode
-        self.initial_clues = [] 
+        self.initial_clues = []
+        self.query = {}
 
         if seed_val is not None:
             random.seed(seed_val)
@@ -446,35 +447,41 @@ with st.container(border=True):
             count = len(people)
             desc = f"查看了 **{target_room}** @ **T{selected_time}**"
             pub = f"该房间共有 **{count} 人**。"
-            
-            if count == 0:
-                pri = "你看到：**空无一人**，可再进行一次调查"
+
+            query_tuple = (target_room, selected_time)
+            if query_tuple in game.query.keys():
+                pri = game.query[query_tuple]
             else:
-                candidates = []
-                for p in people:
-                    is_init = (selected_time == 1) and any(c['char'] == p and c['room'] == target_room for c in game.initial_clues)
-                    row = game.board.loc[p]
-                    visits = len(row[row == target_room])
-                    is_unique_visit = (visits == 1)
-                    
-                    if is_init: score = 0
-                    elif is_unique_visit: score = 1
-                    else: score = 2
-                    
-                    candidates.append({'p': p, 'score': score})
-                
-                random.shuffle(candidates) 
-                candidates.sort(key=lambda x: x['score'], reverse=True)
-                
-                best = candidates[0]
-                
-                if best['score'] == 0:
-                     chars_str = "、".join([c['p'] for c in candidates])
-                     pri = f"⚠️ **无效调查**：初始线索已告知 **{chars_str}** 在 **T1** 位于此处。这是已知信息！"
+                if count == 0:
+                    pri = "你看到：**空无一人**，可再进行一次调查"
                 else:
-                    seen = best['p']
-                    pri = f"你看到了 **{seen}** 独处一室" if count==1 else f"透过缝隙认出了其中的 **{seen}**"
-            
+                    candidates = []
+                    for p in people:
+                        is_init = (selected_time == 1) and any(c['char'] == p and c['room'] == target_room for c in game.initial_clues)
+                        row = game.board.loc[p]
+                        visits = len(row[row == target_room])
+                        is_unique_visit = (visits == 1)
+                        
+                        if is_init: score = 0
+                        elif is_unique_visit: score = 1
+                        else: score = 2
+                        
+                        candidates.append({'p': p, 'score': score})
+                    
+                    random.shuffle(candidates) 
+                    candidates.sort(key=lambda x: x['score'], reverse=True)
+                    
+                    best = candidates[0]
+                    
+                    if best['score'] == 0:
+                        chars_str = "、".join([c['p'] for c in candidates])
+                        pri = f"⚠️ **无效调查**：初始线索已告知 **{chars_str}** 在 **T1** 位于此处。这是已知信息！"
+                    else:
+                        seen = best['p']
+                        pri = f"你看到了 **{seen}** 独处一室" if count==1 else f"透过缝隙认出了其中的 **{seen}**"
+
+                    game.query[query_tuple] = pri
+
             confirm = True
 
     else:
@@ -492,34 +499,40 @@ with st.container(border=True):
             count = len(matches)
             desc = f"查看了 **{target_char}** 是否去过 **{target_room}**"
             pub = f"去过此处 **{count} 次**。"
-            
-            if count == 0:
-                pri = "线索：**从未去过**，可再进行一次调查"
-            else:
-                candidates = []
-                for t in matches:
-                    is_init = (t == 1) and any(c['char'] == target_char and c['room'] == target_room for c in game.initial_clues)
 
-                    col = game.board[t]
-                    occupancy = len(col[col == target_room])
-                    is_single_occupancy = (occupancy == 1)
-                    
-                    if is_init: score = 0
-                    elif is_single_occupancy: score = 1
-                    else: score = 2
-                    
-                    candidates.append({'t': t, 'score': score})
-                
-                random.shuffle(candidates)
-                candidates.sort(key=lambda x: x['score'], reverse=True)
-                
-                best = candidates[0]
-                
-                if best['score'] == 0:
-                    pri = f"⚠️ **无效调查**：初始线索已告知 **{target_char}** 在 **T1** 位于 **{target_room}**。且他没再去过，这是已知信息！"
+            query_tuple = (target_char, target_room)
+            if query_tuple in game.query.keys():
+                pri = game.query[query_tuple]
+            else:
+                if count == 0:
+                    pri = "线索：**从未去过**，可再进行一次调查"
                 else:
-                    reveal = best['t']
-                    pri = f"发现时间：**T{reveal}**" if count==1 else f"发现其中一次是在 **T{reveal}**"
+                    candidates = []
+                    for t in matches:
+                        is_init = (t == 1) and any(c['char'] == target_char and c['room'] == target_room for c in game.initial_clues)
+
+                        col = game.board[t]
+                        occupancy = len(col[col == target_room])
+                        is_single_occupancy = (occupancy == 1)
+                        
+                        if is_init: score = 0
+                        elif is_single_occupancy: score = 1
+                        else: score = 2
+                        
+                        candidates.append({'t': t, 'score': score})
+                    
+                    random.shuffle(candidates)
+                    candidates.sort(key=lambda x: x['score'], reverse=True)
+                    
+                    best = candidates[0]
+                    
+                    if best['score'] == 0:
+                        pri = f"⚠️ **无效调查**：初始线索已告知 **{target_char}** 在 **T1** 位于 **{target_room}**。且他没再去过，这是已知信息！"
+                    else:
+                        reveal = best['t']
+                        pri = f"发现时间：**T{reveal}**" if count==1 else f"发现其中一次是在 **T{reveal}**"
+
+                    game.query[query_tuple] = pri
 
             confirm = True
 
