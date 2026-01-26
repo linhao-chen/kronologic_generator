@@ -17,14 +17,14 @@ def check_password():
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
-        st.markdown("### 🕵️ Kronologic (SoCal 2026)")
+        st.markdown("### 🌉 Kronologic (SoCal 2026)")
         password = st.text_input("Access Code", type="password")
-        if st.button("🔓 Authenticate", use_container_width=True):
+        if st.button("Authenticate", use_container_width=True):
             if password == SECRET_PASSWORD:
                 st.session_state.password_correct = True
                 st.rerun()
             else:
-                st.error("🚫 Access Denied")
+                st.error("Access Denied")
         st.stop()
 
 check_password()
@@ -59,7 +59,6 @@ class ScenarioGenerator:
             random.seed(seed_val)
 
         max_attempts = 1000
-        success = False
 
         for i in range(max_attempts):
             self.board = self._generate_raw_board()
@@ -67,11 +66,9 @@ class ScenarioGenerator:
             if self.mode == "jewel":
                 self.solution_data, is_valid = self._solve_jewel_with_constraints()
                 if is_valid:
-                    success = True
                     break
             else:
                 self.solution_data, is_valid = self._solve_dancer_with_constraints()
-                success = True
                 break
 
         self.initial_clues = self._generate_initial_clues()
@@ -167,10 +164,13 @@ class ScenarioGenerator:
             
             for current_pace in self.pace_list:
                 same_count = False
-                for i in range(0, 3):
+                compare_len = 3
+                if len(current_pace) == 4 and len(p) == 4:
+                    compare_len = 4
+                for i in range(0, compare_len):
                     if current_pace[i] == p[i]:
                         same_count += 1
-                if same_count == 3:
+                if same_count == compare_len:
                     repeat_issue = True
                     break
 
@@ -274,10 +274,14 @@ class GlobalGameState:
         self.logs = {}
         self.versions = {} 
 
-    def get_game(self, room_code, mode_choice="jewel"):
+    def get_game(self, room_code, mode_choice="jewel", forced_seed=""):
         game_key = f"{room_code}_{mode_choice}"
+        if forced_seed:
+            seed_val = int(forced_seed)
+        else:
+            seed_val = int(time.time())
         if game_key not in self.games:
-            self._init_new_game_data(game_key, room_code, mode_choice)
+            self._init_new_game_data(game_key, seed_val, mode_choice)
         return self.games[game_key], self.logs[game_key]
 
     def _init_new_game_data(self, game_key, seed_val, mode_choice):
@@ -313,10 +317,13 @@ class GlobalGameState:
             if game_key in self.games:
                  self._log_initial_clues(game_key, self.games[game_key], mode_choice)
 
-    def new_game(self, room_code, mode_choice):
+    def new_game(self, room_code, mode_choice, forced_seed):
         game_key = f"{room_code}_{mode_choice}"
-        new_seed = int(time.time())
-        new_game = ScenarioGenerator(seed_val=new_seed, mode=mode_choice)
+        if forced_seed:
+            seed_val = int(forced_seed)
+        else:
+            seed_val = int(time.time())
+        new_game = ScenarioGenerator(seed_val=seed_val, mode=mode_choice)
         self.games[game_key] = new_game
         self.logs[game_key] = []
         self.versions[game_key] = time.time()
@@ -329,7 +336,7 @@ class GlobalGameState:
             
             entry = {
                 "time": "00:00",
-                "player": "🫅 系统",
+                "player": "系统",
                 "desc": "发布初始信息 (T1)",
                 "public": f"📍 {clue_str}",
                 "private": "所有玩家可见",
@@ -347,7 +354,7 @@ class GlobalGameState:
             
             entry_pace = {
                 "time": "00:00",
-                "player": "🫅 系统",
+                "player": "系统",
                 "desc": "发布舞步信息 (Pace)",
                 "public": f"👣 {pace_str}",
                 "private": "所有玩家可见",
@@ -371,7 +378,10 @@ if "local_version" not in st.session_state:
 if "has_revealed" not in st.session_state:
     st.session_state.has_revealed = False
 
-# --- Sidebar ---
+# ==============================================================================
+# 3.1 Sidebar
+# ==============================================================================
+
 with st.sidebar:
     st.header("🕵️ 游戏设置")
     game_mode_label = st.radio("玩法模式", ["💎 名伶的珠宝 (Paris 1920)", "💃 祭祀仪式-简单 (Cuzco 1450)", "🎎 祭祀仪式-复杂 (Cuzco 1450)"], index=0)
@@ -381,9 +391,10 @@ with st.sidebar:
     elif "复杂" in game_mode_label:
         mode_code = "ritual_hard"
 
-    st.subheader("2. 身份信息")
+    st.subheader("身份/房间信息")
     username = st.text_input("你的代号", key="user_name")
     room_code = st.text_input("房间号码", value=st.session_state.default_room, key="room_code")
+    forced_seed = st.text_input("随机种子 (Optional)", value="")
 
     st.markdown("---")
     c1, c2 = st.columns(2)
@@ -393,15 +404,18 @@ with st.sidebar:
             st.rerun()
     with c2:
         if st.button("🆕 开启新局"):
-            SERVER.new_game(room_code, mode_code)
+            SERVER.new_game(room_code, mode_code, forced_seed)
             st.rerun()
 
 if not username or not room_code:
     st.info("👈 请点击左上角【>】展开侧边栏，输入代号开始。")
     st.stop()
 
-# --- Sync Logic ---
-game, logs = SERVER.get_game(room_code, mode_code)
+# =========================================================
+# 3.2 Header 
+# =========================================================
+
+game, logs = SERVER.get_game(room_code, mode_code, forced_seed)
 server_version = SERVER.get_version(room_code, mode_code)
 
 if st.session_state.local_version != server_version:
@@ -409,7 +423,6 @@ if st.session_state.local_version != server_version:
     st.session_state.local_version = server_version
     st.rerun()
 
-# --- Header ---
 mode_icon = "💎" if mode_code == "jewel" else "🎎"
 st.subheader(f"{mode_icon} 房间 {room_code} | 🕵️ {username}")
 
@@ -421,19 +434,18 @@ if mode_code == "jewel":
 else:
     st.error(f"🎎 **目标：** 推出 **T6** 时所有巫舞者的位置！")
 
-
 # =========================================================
-# Logistics
+# 3.3 Investigation 
 # =========================================================
 
 st.markdown("### 🔍 发起调查")
 
 with st.container(border=True):
-    q_type = st.radio("模式", ["🏛️ 查地点", "👤 查人物"], horizontal=True, label_visibility="collapsed")
+    q_type = st.radio("模式", ["🏛️ 调查地点", "🪪 调查人物"], horizontal=True, label_visibility="collapsed")
     confirm = False
     desc, pub, pri = "", "", ""
 
-    if "查地点" in q_type:
+    if "调查地点" in q_type:
         col_a1, col_a2 = st.columns([1.5, 1])
         if mode_code == "jewel":
             with col_a1: target_room = st.selectbox("选择房间", ROOMS)
@@ -475,7 +487,7 @@ with st.container(border=True):
                     
                     if best['score'] == 0:
                         chars_str = "、".join([c['p'] for c in candidates])
-                        pri = f"⚠️ **无效调查**：初始线索已告知 **{chars_str}** 在 **T1** 位于此处。这是已知信息！"
+                        pri = f"⚠️ **已知信息**：初始线索已告知 **{chars_str}** 在 **T1** 位于此处, 可再调查一次。"
                     else:
                         seen = best['p']
                         pri = f"你看到了 **{seen}** 独处一室" if count==1 else f"透过缝隙认出了其中的 **{seen}**"
@@ -527,7 +539,7 @@ with st.container(border=True):
                     best = candidates[0]
                     
                     if best['score'] == 0:
-                        pri = f"⚠️ **无效调查**：初始线索已告知 **{target_char}** 在 **T1** 位于 **{target_room}**。且他没再去过，这是已知信息！"
+                        pri = f"⚠️ **已知信息**：初始线索已告知 **{target_char}** 在 **T1** 位于 **{target_room}**, 可再调查一次。"
                     else:
                         reveal = best['t']
                         pri = f"发现时间：**T{reveal}**" if count==1 else f"发现其中一次是在 **T{reveal}**"
@@ -543,6 +555,10 @@ with st.container(border=True):
         st.rerun()
 
 st.divider() 
+
+# =========================================================
+# 3.4 History
+# =========================================================
 
 col_log_title, col_log_btn = st.columns([3, 1], vertical_alignment="center")
 with col_log_title:
@@ -564,7 +580,7 @@ for log in logs:
             st.write(f"**{log['player']}** {log['desc']} ({log['time']})")
             st.info(f"📢 {log['public']}")
             if is_me: 
-                if "无效调查" in log['private']:
+                if "已知信息" in log['private']:
                     st.error(f"{log['private']}")
                 else:
                     st.success(f"🔒 {log['private']}")
@@ -572,7 +588,7 @@ for log in logs:
 st.markdown("---")
 
 # =========================================================
-# Solution
+# 3.5 Solution
 # =========================================================
 
 with st.expander("🔐 查看答案"):
@@ -583,7 +599,7 @@ with st.expander("🔐 查看答案"):
             SERVER.add_log(
                 room_code, mode_code,
                 username, 
-                "⛔ 查看了谜底！游戏可能已结束。", 
+                "查看了答案！游戏可能已结束。", 
                 "注意：该玩家已知晓真相", 
                 "N/A",
                 log_type="warning"
@@ -591,6 +607,7 @@ with st.expander("🔐 查看答案"):
             st.rerun()
     
     if st.session_state.has_revealed:
+        st.caption("随机种子: " + str(game.seed_val))
         if mode_code == "jewel":
             tab_ans_1, tab_ans_2 = st.tabs(["💎 珠宝流向", "🗺️ 位置表"])
         else:
