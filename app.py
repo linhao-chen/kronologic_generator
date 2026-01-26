@@ -34,7 +34,9 @@ check_password()
 # ==============================================================================
 
 ROOMS = ["牌坊", "信号", "鱿鱼", "面具", "音乐", "舞蹈"]
+TERRAIN_LOOP = ["山", "太阳", "星星", "台阶", "圆盘", "田"]
 CHARACTERS = ["(A) Accessoiriste", "(B) Baroness", "(C) Chauffeur", "(D) Director", "(J) Journalist", "(S) Soprano"]
+SHARMANS = ["(A) Artisan", "(E) Educator", "(F) Farmer", "(M) Merchant", "(P) Priestess", "(S) Soldier"]
 TIMES = [1, 2, 3, 4, 5, 6]
 
 MAP_GRAPH = {
@@ -62,36 +64,80 @@ class ScenarioGenerator:
             self.board = self._generate_raw_board()
             
             if self.mode == "jewel":
-                self.solution_data, self.difficulty, is_valid = self._solve_jewel_with_constraints()
+                self.solution_data, is_valid = self._solve_jewel_with_constraints()
                 if is_valid:
                     success = True
                     break
             else:
-                self.solution_data, self.difficulty = self._solve_murder()
+                self.solution_data, is_valid = self._solve_dancer_with_constraints()
                 success = True
                 break
-        
-        if not success:
-            if self.mode == "jewel":
-                 self.solution_data, _, _ = self._solve_jewel_with_constraints()
-            else:
-                 self.solution_data, _ = self._solve_murder()
 
         self.initial_clues = self._generate_initial_clues()
         
     def _generate_raw_board(self):
-        data = {char: [] for char in CHARACTERS}
-        for char in CHARACTERS:
-            current_loc = random.choice(ROOMS)
-            data[char].append(current_loc)
-            for _ in range(5):
-                possible_moves = MAP_GRAPH[current_loc]
-                next_loc = random.choice(possible_moves)
-                data[char].append(next_loc)
-                current_loc = next_loc
+        if self.mode == "jewel":
+            data = {char: [] for char in CHARACTERS}
+            for char in CHARACTERS:
+                current_loc = random.choice(ROOMS)
+                data[char].append(current_loc)
+                for _ in range(5):
+                    possible_moves = MAP_GRAPH[current_loc]
+                    next_loc = random.choice(possible_moves)
+                    data[char].append(next_loc)
+                    current_loc = next_loc
+            
+        else:
+            data = {char: [] for char in SHARMANS}
+            self.ritual_patterns = {} 
+
+            cycle_len = 3
+            
+            for char in SHARMANS:
+                # 1. Generate location at T1
+                start_room = random.choice(TERRAIN_LOOP)
+                start_index = TERRAIN_LOOP.index(start_room)
+                
+                # 2. Generate Pace
+                pattern = self._generate_valid_pattern(cycle_len)
+                
+                # 3. Generate Offset
+                pattern_offset = random.randint(0, cycle_len - 1)
+                
+                self.ritual_patterns[char] = {
+                    "pattern": pattern,
+                    "start_offset": pattern_offset, 
+                    "start_room": start_room
+                }
+                
+                # 4. Simulation T1 - T6
+                locs = [start_room] # T1
+                current_idx = start_index
+                
+                for i in range(5):
+                    step_idx = (pattern_offset + i) % cycle_len
+                    steps = pattern[step_idx]
+                    
+                    current_idx = (current_idx + steps) % 6
+                    locs.append(TERRAIN_LOOP[current_idx])
+                    
+                data[char] = locs
+                
         board = pd.DataFrame(data).T
         board.columns = TIMES
         return board
+
+    def _generate_valid_pattern(self, length, min_sum=5, max_sum=8):
+        while True:
+            p = []
+            for _ in range(length):
+                if random.random() < 0.8:
+                    p.append(random.randint(1, 2))
+                else:
+                    p.append(3)
+            
+            if min_sum <= sum(p) <= max_sum:
+                return p
 
     def _solve_jewel_with_constraints(self):
         SPAWN_ROOM = "舞蹈" 
@@ -142,9 +188,9 @@ class ScenarioGenerator:
                 spawn_condition = True
                 break
 
-        return pd.DataFrame(log), swap_count, spawn_condition
+        return pd.DataFrame(log), spawn_condition
 
-    def _solve_murder(self):
+    def _solve_dancer_with_constraints(self):
         valid_options = []
         for t in TIMES:
             for r in ROOMS:
@@ -158,20 +204,23 @@ class ScenarioGenerator:
     
     def _generate_initial_clues(self):
         excluded_person = None
+        clues = []
+
         if self.mode == "jewel":
             t1_row = self.solution_data[self.solution_data["Time"] == 1]
             if not t1_row.empty:
                 row_data = t1_row.iloc[0]
                 if "发现珠宝" in str(row_data["Desc"]):
                     excluded_person = row_data["Holder"]
-        
-        candidates = [c for c in CHARACTERS if c != excluded_person]
-        selected = random.sample(candidates, 3)
-        
-        clues = []
-        for char in selected:
-            room = self.board.loc[char, 1]
-            clues.append({"char": char, "room": room}) 
+            candidates = [c for c in CHARACTERS if c != excluded_person]
+            selected = random.sample(candidates, 3)
+            for char in selected:
+                room = self.board.loc[char, 1]
+                clues.append({"char": char, "room": room}) 
+        else:
+            for char in SHARMANS:
+                room = self.board.loc[char, 1]
+                clues.append({"char": char, "room": room})
             
         return clues
 
@@ -268,8 +317,12 @@ if "has_revealed" not in st.session_state:
 # --- Sidebar ---
 with st.sidebar:
     st.header("🕵️ 游戏设置")
-    game_mode_label = st.radio("玩法模式", ["💎 名伶的珠宝 (Paris 1920)", "🎎 祭祀仪式 (Cuzco 1450)"], index=0)
-    mode_code = "jewel" if "珠宝" in game_mode_label else "murder"
+    game_mode_label = st.radio("玩法模式", ["💎 名伶的珠宝 (Paris 1920)", "💃 祭祀仪式-简单 (Cuzco 1450)", "🎎 祭祀仪式-复杂 (Cuzco 1450)"], index=0)
+    mode_code = "jewel" 
+    if "简单" in game_mode_label:
+        mode_code = "ritual_easy"
+    elif "复杂" in game_mode_label:
+        mode_code = "ritual_hard"
 
     st.subheader("2. 身份信息")
     username = st.text_input("你的代号", key="user_name")
@@ -325,8 +378,12 @@ with st.container(border=True):
 
     if "查地点" in q_type:
         col_a1, col_a2 = st.columns([1.5, 1])
-        with col_a1: target_room = st.selectbox("选择房间", ROOMS)
-        with col_a2: selected_time = st.selectbox("选择时间", TIMES)
+        if mode_code == "jewel":
+            with col_a1: target_room = st.selectbox("选择房间", ROOMS)
+            with col_a2: selected_time = st.selectbox("选择时间", TIMES)
+        else:
+            with col_a1: target_room = st.selectbox("选择房间", TERRAIN_LOOP)
+            with col_a2: selected_time = st.selectbox("选择时间", TIMES[:5])
         
         if st.button("🔎 确认调查", use_container_width=True, type="primary"):
             people = game.board[selected_time][game.board[selected_time] == target_room].index.tolist()
@@ -366,8 +423,12 @@ with st.container(border=True):
 
     else:
         col_b1, col_b2 = st.columns([1, 1.5])
-        with col_b1: target_char = st.selectbox("选择角色", CHARACTERS)
-        with col_b2: target_room = st.selectbox("去过这个房间吗？", ROOMS)
+        if mode_code == "jewel":
+            with col_b1: target_char = st.selectbox("选择角色", CHARACTERS)
+            with col_b2: target_room = st.selectbox("去过这个房间吗？", ROOMS)
+        else:
+            with col_b1: target_char = st.selectbox("选择巫舞者", SHARMANS)
+            with col_b2: target_room = st.selectbox("去过这个祭坛吗？", TERRAIN_LOOP)
         
         if st.button("🔎 确认调查", use_container_width=True, type="primary"):
             row = game.board.loc[target_char]
@@ -461,7 +522,10 @@ with st.expander("🔐 查看答案"):
             st.rerun()
     
     if st.session_state.has_revealed:
-        tab_ans_1, tab_ans_2 = st.tabs(["💎 珠宝流向", "🗺️ 位置表"])
+        if mode_code == "jewel":
+            tab_ans_1, tab_ans_2 = st.tabs(["💎 珠宝流向", "🗺️ 位置表"])
+        else:
+            tab_ans_1, tab_ans_2 = st.tabs(["🗺️ 位置表", "💃 祭祀步频"])
         
         with tab_ans_1:
             if mode_code == "jewel":
@@ -469,9 +533,8 @@ with st.expander("🔐 查看答案"):
                 final = game.solution_data.iloc[-1]
                 st.error(f"🏆 **最终答案**: 珠宝在 **{final['Holder']}** 手中，位于 **{final['Room']}**")
             else:
-                truth = game.solution_data.iloc[0]
-                st.error(f"🏆 **凶手真相**: **{truth['Culprit']}** 在 **{truth['Room']}** (T{truth['Time']}) 作案")
-        
+                pass
+
         with tab_ans_2:
             st.dataframe(game.board, use_container_width=True)
             st.caption("行：角色 | 列：时间 (T1-T6)")
