@@ -8,7 +8,7 @@ from datetime import datetime
 # 0. Authentication & Config
 # ==============================================================================
 
-st.set_page_config(page_title="Kronologic Mobile", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Kronologic (SoCal 2026)", layout="wide", initial_sidebar_state="collapsed")
 
 def check_password():
     SECRET_PASSWORD = "tianhaoyun" 
@@ -17,7 +17,7 @@ def check_password():
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
-        st.markdown("### 🕵️ Kronologic at SoCal")
+        st.markdown("### 🕵️ Kronologic (SoCal 2026)")
         password = st.text_input("Access Code", type="password")
         if st.button("🔓 Authenticate", use_container_width=True):
             if password == SECRET_PASSWORD:
