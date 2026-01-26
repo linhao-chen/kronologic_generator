@@ -11,10 +11,7 @@ from datetime import datetime
 st.set_page_config(page_title="Kronologic Mobile", layout="wide", initial_sidebar_state="collapsed")
 
 def check_password():
-    try:
-        SECRET_PASSWORD = st.secrets["GAME_PASSWORD"]
-    except FileNotFoundError:
-        SECRET_PASSWORD = "tianhaoyun" 
+    SECRET_PASSWORD = "tianhaoyun" 
 
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
