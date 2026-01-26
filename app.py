@@ -17,7 +17,7 @@ def check_password():
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
-        st.markdown("### 🕵️ Kronologic Headquarter")
+        st.markdown("### 🕵️ Kronologic at SoCal")
         password = st.text_input("Access Code", type="password")
         if st.button("🔓 Authenticate", use_container_width=True):
             if password == SECRET_PASSWORD:
