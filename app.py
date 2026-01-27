@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import base64
 import random
 import time
+import os
 from datetime import datetime
 
 # ==============================================================================
@@ -10,6 +12,11 @@ from datetime import datetime
 
 st.set_page_config(page_title="Kronologic (SoCal 2026)", layout="wide", initial_sidebar_state="collapsed")
 
+def get_base64(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
 def check_password():
     SECRET_PASSWORD = st.secrets["PASSWORD"]
 
@@ -17,14 +24,89 @@ def check_password():
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
-        st.markdown("### 🌉 Kronologic (SoCal 2026)")
-        password = st.text_input("Access Code", type="password")
-        if st.button("Authenticate", use_container_width=True):
-            if password == SECRET_PASSWORD:
-                st.session_state.password_correct = True
-                st.rerun()
-            else:
-                st.error("Access Denied")
+        local_image_path = "cover.png"
+        
+        background_style = """
+        <style>
+        .stApp { background-color: #1E1E1E; }
+        </style>
+        """
+
+        if os.path.exists(local_image_path):
+            try:
+                img_ext = local_image_path.split(".")[-1]
+                base64_str = get_base64(local_image_path)
+                
+                background_style = f"""
+                <style>
+                .stApp {{
+                    background-image: url("data:image/{img_ext};base64,{base64_str}");
+                    background-size: cover;
+                    background-position: center 60px;
+                    background-repeat: no-repeat;
+                    background-attachment: fixed;
+                }}
+                
+                input {{
+                    background-color: rgba(0, 0, 0, 0.6) !important;
+                    color: white !important;
+                    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                }}
+
+                div.stButton > button {{
+                    background-color: rgba(0, 0, 0, 0.6) !important;
+                    color: white !important;
+                    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                }}
+
+                div.stButton > button:hover {{
+                    background-color: #000000 !important;
+                    color: #ffffff !important;
+                    border-color: #ffffff !important;
+                    transform: scale(1.02);
+                }}
+
+                div.stButton > button:active {{
+                    background-color: #333333 !important;
+                    border-color: #ffffff !important;
+                }}
+
+                [data-testid="stAlert"] {{
+                    background-color: rgba(255, 230, 230, 0.95) !important;
+                    border: 1px solid #ff4b4b !important;
+                    color: #7d1515 !important;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+                }}
+
+                [data-testid="stAlert"] p, [data-testid="stAlert"] svg {{
+                    fill: #7d1515 !important;
+                    color: #7d1515 !important;
+                }}
+
+                .main .block-container {{
+                    padding-top: 50px;
+                }}
+                </style>
+                """
+            except Exception as e:
+                st.error(f"Error loading background: {e}")
+
+        st.markdown(background_style, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            st.markdown("<br><br><br>", unsafe_allow_html=True)
+            
+            password = st.text_input("Access Code", type="password")
+            
+            if st.button("Authenticate", use_container_width=True):
+                if password == SECRET_PASSWORD:
+                    st.session_state.password_correct = True
+                    st.rerun()
+                else:
+                    st.error("Access Denied")
+        
         st.stop()
 
 check_password()
