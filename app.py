@@ -42,7 +42,7 @@ def check_password():
                 .stApp {{
                     background-image: url("data:image/{img_ext};base64,{base64_str}");
                     background-size: cover;
-                    background-position: center 60px;
+                    background-position: center 55px;
                     background-repeat: no-repeat;
                     background-attachment: fixed;
                 }}
