@@ -98,7 +98,7 @@ def check_password():
         with col2:
             st.markdown("<br><br><br>", unsafe_allow_html=True)
             
-            password = st.text_input("Access Code", type="password")
+            password = st.text_input("", type="password")
             
             if st.button("Authenticate", use_container_width=True):
                 if password == SECRET_PASSWORD:
@@ -670,7 +670,99 @@ for log in logs:
 st.markdown("---")
 
 # =========================================================
-# 3.5 Solution
+# 3.5 Scratchpad (Beta)
+# =========================================================
+
+if mode_code == "jewel":
+    current_chars = CHARACTERS
+    current_rooms = ROOMS
+else:
+    current_chars = SHARMANS
+    current_rooms = TERRAIN_LOOP
+
+str_times = [str(t) for t in TIMES]
+
+storage_key = f"scratch_storage_{mode_code}"
+
+if storage_key not in st.session_state:
+    init_df = pd.DataFrame(columns=["Role"] + str_times)
+    init_df["Role"] = current_chars
+    st.session_state[storage_key] = init_df
+
+original_df = st.session_state[storage_key]
+
+with st.expander("📝 草稿本 (BETA)"):
+    
+    column_config = {
+        "Role": st.column_config.TextColumn("角色", disabled=True, width="medium"),
+    }
+    for t_str in str_times:
+        column_config[t_str] = st.column_config.SelectboxColumn(
+            f"T{t_str}", width="small", options=current_rooms, required=False
+        )
+
+    edited_df = st.data_editor(
+        original_df, 
+        column_config=column_config,
+        use_container_width=True,
+        hide_index=True,
+        key=f"editor_{mode_code}"
+    )
+    
+    if not edited_df.equals(original_df):
+        st.session_state[storage_key] = edited_df
+        st.rerun()
+
+    st.divider()
+    
+    if mode_code == "jewel":
+        visual_rooms_order = current_rooms
+    else:
+        visual_rooms_order = current_rooms[:3] + current_rooms[3:][::-1]
+
+    map_tabs = st.tabs([f"🕒 T{t}" for t in str_times])
+    
+    for i, t_str in enumerate(str_times):
+        with map_tabs[i]:
+            room_occupancy = {r: [] for r in current_rooms}
+            unknown_chars = []
+
+            for index, row in edited_df.iterrows():
+                char = row["Role"]
+                loc = row[t_str]
+                
+                if pd.isna(char): continue
+
+                if loc and loc in room_occupancy:
+                    short_name = char.split(")")[0] + ")" 
+                    room_occupancy[loc].append(short_name)
+                else:
+                    unknown_chars.append(char.split(")")[0] + ")")
+
+            cols = st.columns(3)
+            for idx, room in enumerate(visual_rooms_order):
+                with cols[idx % 3]:
+                    occupants = room_occupancy[room]
+                    
+                    if occupants:
+                        content = " ".join([f"**{p}**" for p in occupants])
+                        st.success(f"📍 **{room}**\n\n{content}")
+                    else:
+                        st.error(f"📍 **{room}**\n\n*(空)*")
+            
+            if unknown_chars:
+                st.caption(f"❓ 未定: {', '.join(unknown_chars)}")
+
+    if st.button("🗑️ 清空当前笔记"):
+        empty_df = pd.DataFrame(columns=["Role"] + str_times)
+        empty_df["Role"] = current_chars
+        st.session_state[storage_key] = empty_df
+        st.rerun()
+
+st.markdown("---")
+
+# =========================================================
+# 3.6 Solution
 # =========================================================
 
 with st.expander("🔐 查看答案"):
