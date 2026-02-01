@@ -42,7 +42,7 @@ def check_password():
                 .stApp {{
                     background-image: url("data:image/{img_ext};base64,{base64_str}");
                     background-size: cover;
-                    background-position: center 60px;
+                    background-position: center 55px;
                     background-repeat: no-repeat;
                     background-attachment: fixed;
                 }}
@@ -642,32 +642,36 @@ st.divider()
 # 3.4 History
 # =========================================================
 
-col_log_title, col_log_btn = st.columns([3, 1], vertical_alignment="center")
-with col_log_title:
-    st.markdown("### 📡 实时记录")
-with col_log_btn:
-    if st.button("🔄 刷新", key="refresh_main", use_container_width=True):
-        st.rerun()
+@st.fragment(run_every=5)
+def sync_logs():
+    col_log_title, col_log_btn = st.columns([3, 1], vertical_alignment="center")
+    with col_log_title:
+        st.markdown("### 📡 实时记录")
+    with col_log_btn:
+        if st.button("🔄 刷新", key="refresh_main", use_container_width=True):
+            st.rerun()
 
-if not logs: 
-    st.caption("暂无记录，请在上方发起调查...")
+    if not logs: 
+        st.caption("暂无记录，请在上方发起调查...")
 
-for log in logs:
-    if log.get("type") == "warning":
-        st.warning(f"📢 **{log['player']}** {log['desc']} ({log['time']})\n\n{log['public']}")
-    else:
-        is_me = (log['owner'] == username)
-        avatar_icon = "😎" if is_me else "🕵️"
-        with st.chat_message(log['player'], avatar=avatar_icon):
-            st.write(f"**{log['player']}** {log['desc']} ({log['time']})")
-            st.info(f"📢 {log['public']}")
-            if is_me: 
-                if "已知信息" in log['private']:
-                    st.error(f"{log['private']}")
-                else:
-                    st.success(f"🔒 {log['private']}")
+    for log in logs:
+        if log.get("type") == "warning":
+            st.warning(f"📢 **{log['player']}** {log['desc']} ({log['time']})\n\n{log['public']}")
+        else:
+            is_me = (log['owner'] == username)
+            avatar_icon = "😎" if is_me else "🕵️"
+            with st.chat_message(log['player'], avatar=avatar_icon):
+                st.write(f"**{log['player']}** {log['desc']} ({log['time']})")
+                st.info(f"📢 {log['public']}")
+                if is_me: 
+                    if "已知信息" in log['private']:
+                        st.error(f"{log['private']}")
+                    else:
+                        st.success(f"🔒 {log['private']}")
 
-st.markdown("---")
+    st.markdown("---")
+
+sync_logs()
 
 # =========================================================
 # 3.5 Scratchpad (Beta)
