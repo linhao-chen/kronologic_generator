@@ -42,7 +42,7 @@ def check_password():
                 .stApp {{
                     background-image: url("data:image/{img_ext};base64,{base64_str}");
                     background-size: cover;
-                    background-position: center 55px;
+                    background-position: center 60px;
                     background-repeat: no-repeat;
                     background-attachment: fixed;
                 }}
@@ -171,8 +171,6 @@ class ScenarioGenerator:
             data = {char: [] for char in SHARMANS}
             self.ritual_patterns = {} 
             self.pace_list = []
-
-            cycle_len = 3
             
             for char in SHARMANS:
                 # 1. Generate location at T1
@@ -194,6 +192,8 @@ class ScenarioGenerator:
                 # 4. Simulation T1 - T6
                 locs = [start_room] # T1
                 current_idx = start_index
+
+                cycle_len = len(pattern)
                 
                 for i in range(5):
                     step_idx = (pattern_offset + i) % cycle_len
@@ -210,7 +210,7 @@ class ScenarioGenerator:
 
     def _generate_valid_pattern(self):
         choices = [1, 2, 3]
-        base_weights = {1: 50, 2: 35, 3: 15}
+        base_weights = {1: 50, 2: 40, 3: 10}
         min_sum = 5
 
         if self.mode == "ritual_easy":
