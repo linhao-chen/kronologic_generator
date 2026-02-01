@@ -194,7 +194,7 @@ class ScenarioGenerator:
                 current_idx = start_index
 
                 cycle_len = len(pattern)
-                
+
                 for i in range(5):
                     step_idx = (pattern_offset + i) % cycle_len
                     steps = pattern[step_idx]
