@@ -223,10 +223,12 @@ class ScenarioGenerator:
             group_selected = random.choices(group_list, weights=base_weights, k=1)[0]
             
             selection = random.choices(group_selected)
+
+            result = list(map(int, selection[0]))
             
-            if selection not in self.pace_list:
-                self.pace_list.append(selection)
-                return selection
+            if result not in self.pace_list:
+                self.pace_list.append(result)
+                return result
 
     def _solve_jewel_with_constraints(self):
         SPAWN_ROOM = "舞蹈" 
