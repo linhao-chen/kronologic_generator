@@ -209,56 +209,24 @@ class ScenarioGenerator:
         return board
 
     def _generate_valid_pattern(self):
-        choices = [1, 2, 3]
-        base_weights = {1: 50, 2: 40, 3: 10}
-        min_sum = 5
+        group_1 = ["111", "112", "113", "222", "123", "133", "122", "223", "233", "333"]
+        group_2 = ["1112", "1113", "1123", "1133", "1122"]
+        group_3 = ["1222", "1223", "1233", "1333", "2223", "2233", "2333"]
 
         if self.mode == "ritual_easy":
-            max_sum = 7
+            base_weights = [100, 0 ,0]
         else:
-            max_sum = 8
+            base_weights = [66, 20, 14]
         
+        group_list = [group_1, group_2, group_3]
         while True:
-            p = []
-            s1 = random.choices(choices, weights=[base_weights[c] for c in choices], k=1)[0]
-            p.append(s1)
-
-            if self.mode == "ritual_easy":
-                cycle_len = 3
-            else:
-                cycle_len = random.choices([3, 4], weights=[0.67, 0.33])[0]
+            group_selected = random.choices(group_list, weights=base_weights, k=1)[0]
             
-            for _ in range(cycle_len - 1):
-                prev = p[-1]
-                valid_options = [x for x in choices if x >= prev]
-
-                current_weights = [base_weights[x] for x in valid_options]
-                
-                s_next = random.choices(valid_options, weights=current_weights, k=1)[0]
-                p.append(s_next)
+            selection = random.choices(group_selected)
             
-            # validity check
-            range_issue = False
-            repeat_issue = False
-
-            if not(min_sum <= sum(p) <= max_sum):
-                range_issue = True
-            
-            for current_pace in self.pace_list:
-                same_count = False
-                compare_len = 3
-                if len(current_pace) == 4 and len(p) == 4:
-                    compare_len = 4
-                for i in range(0, compare_len):
-                    if current_pace[i] == p[i]:
-                        same_count += 1
-                if same_count == compare_len:
-                    repeat_issue = True
-                    break
-
-            if not (range_issue or repeat_issue):
-                self.pace_list.append(p)
-                return p
+            if selection not in self.pace_list:
+                self.pace_list.append(selection)
+                return selection
 
     def _solve_jewel_with_constraints(self):
         SPAWN_ROOM = "舞蹈" 
