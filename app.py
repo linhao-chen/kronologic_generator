@@ -160,6 +160,8 @@ SD_GRAPH = {
 # ==============================================================================
 
 class BaseModeHandler:
+    """Contract that every mode must fulfil.  Never instantiated directly."""
+
     # --- static metadata (override in subclass) ---
     MODE_CODE   = ""          # e.g. "jewel"
     ICON        = ""          # e.g. "💎"
@@ -381,7 +383,7 @@ class RitualHandler(BaseModeHandler):
 
     # ---- solving ----
     def solve(self, board: pd.DataFrame):
-        # Ritual has no single "jewel" solution; validity is always True.
+        # Ritual has no single "jewel" solution; always valid on first try.
         # solution_data is unused in the ritual answer panel (board is shown directly).
         valid_options = []
         for t in TIMES:
@@ -391,9 +393,9 @@ class RitualHandler(BaseModeHandler):
                     for p in people:
                         valid_options.append({"Time": t, "Room": r, "Culprit": p})
         if not valid_options:
-            return pd.DataFrame([]), 0
+            return pd.DataFrame([]), True
         truth = random.choice(valid_options)
-        return pd.DataFrame([truth]), 0
+        return pd.DataFrame([truth]), True
 
     # ---- initial clues ----
     def generate_initial_clues(self, board, solution_data) -> list:
@@ -528,9 +530,9 @@ class SDEngineerHandler(BaseModeHandler):
                     for p in people:
                         valid_options.append({"Time": t, "Room": r, "Culprit": p})
         if not valid_options:
-            return pd.DataFrame([]), 0
+            return pd.DataFrame([]), True
         truth = random.choice(valid_options)
-        return pd.DataFrame([truth]), 0
+        return pd.DataFrame([truth]), True
 
     # ---- initial clues ----
     def generate_initial_clues(self, board, solution_data) -> list:
@@ -623,7 +625,8 @@ class ScenarioGenerator:
             self.solution_data, is_valid = self.handler.solve(self.board)
             if is_valid:
                 break
-            # modes that always return truthy validity (ritual / sd) break on first try
+            # jewel: retries until spawn_condition is met (jewel found by T3)
+            # ritual / sd: solve() always returns True → breaks on first iteration
 
         self.initial_clues = self.handler.generate_initial_clues(self.board, self.solution_data)
 
